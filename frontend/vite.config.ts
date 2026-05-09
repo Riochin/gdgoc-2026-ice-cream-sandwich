@@ -9,7 +9,7 @@ export default defineConfig({
     react()
   ],
   build: {
-    outDir: '../backend/internal/ui/dist',
+    outDir: '../backend/frontend/dist',
     emptyOutDir: true,
   },
   server: {
