@@ -1,52 +1,113 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { type Message, sendChatMessage } from '../lib/api';
+import {
+  type ChatSession,
+  createEmptySession,
+  deriveTitle,
+  loadState,
+  saveState,
+} from '../lib/sessions';
 
 export function useChat() {
-  const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: 'こんにちは！探したいレストランの条件を教えてください。' }
-  ]);
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [currentId, setCurrentId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
-  // セッションIDはハッカソン用として固定値を使いますが、
-  // 拡張する場合はランダムなUUID等を生成してください。
-  const sessionId = 'demo-session-1';
 
-  const sendMessage = useCallback(async (text: string) => {
-    if (!text.trim()) return;
+  // Hydrate from localStorage on mount.
+  useEffect(() => {
+    const initial = loadState();
+    setSessions(initial.sessions);
+    setCurrentId(initial.currentId);
+  }, []);
 
-    const userMessage: Message = { role: 'user', content: text };
-    const newHistory = [...messages, userMessage];
-    
-    // UIを即時更新
-    setMessages(newHistory);
-    setIsLoading(true);
+  // Persist on change.
+  useEffect(() => {
+    if (sessions.length === 0 || !currentId) return;
+    saveState({ sessions, currentId });
+  }, [sessions, currentId]);
+
+  const currentSession = useMemo(
+    () => sessions.find((s) => s.id === currentId),
+    [sessions, currentId],
+  );
+  const messages = currentSession?.messages ?? [];
+
+  const newSession = useCallback(() => {
+    const session = createEmptySession();
+    setSessions((prev) => [session, ...prev]);
+    setCurrentId(session.id);
     setError(null);
+  }, []);
 
-    try {
-      const response = await sendChatMessage({
-        session_id: sessionId,
-        message: text,
-        history: messages, // ユーザーの今のメッセージは除いた履歴を送る（仕様次第ですが、新しいメッセージは別プロパティなため）
-      });
+  const switchSession = useCallback((id: string) => {
+    setCurrentId(id);
+    setError(null);
+  }, []);
 
-      // アシスタントからの返答を履歴に追加
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: response.reply }
-      ]);
-    } catch (err) {
-      console.error('Chat Error:', err);
-      setError('通信エラーが発生しました。もう一度お試しください。');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [messages, sessionId]);
+  const sendMessage = useCallback(
+    async (text: string) => {
+      if (!text.trim() || !currentId) return;
+
+      const userMessage: Message = { role: 'user', content: text };
+      const historyBeforeSend = messages;
+      const optimisticMessages = [...historyBeforeSend, userMessage];
+
+      // Optimistic UI update + title derivation.
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === currentId
+            ? {
+                ...s,
+                messages: optimisticMessages,
+                title: deriveTitle(optimisticMessages),
+                updatedAt: Date.now(),
+              }
+            : s,
+        ),
+      );
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const response = await sendChatMessage({
+          session_id: currentId,
+          message: text,
+          history: historyBeforeSend,
+        });
+
+        setSessions((prev) =>
+          prev.map((s) =>
+            s.id === currentId
+              ? {
+                  ...s,
+                  messages: [
+                    ...optimisticMessages,
+                    { role: 'assistant', content: response.reply },
+                  ],
+                  updatedAt: Date.now(),
+                }
+              : s,
+          ),
+        );
+      } catch (err) {
+        console.error('Chat Error:', err);
+        setError(err instanceof Error ? err.message : '通信エラーが発生しました。もう一度お試しください。');
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [currentId, messages],
+  );
 
   return {
+    sessions,
+    currentId,
     messages,
     isLoading,
     error,
-    sendMessage
+    sendMessage,
+    newSession,
+    switchSession,
   };
 }
