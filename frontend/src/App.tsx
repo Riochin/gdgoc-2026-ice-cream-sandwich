@@ -5,7 +5,14 @@ import { Input } from './components/ui/input';
 import { SidebarLayout } from './components/ui/sidebar-layout';
 import { Sidebar, SidebarHeader, SidebarBody, SidebarItem, SidebarLabel, SidebarSection, SidebarHeading } from './components/ui/sidebar';
 import { Navbar, NavbarItem, NavbarSection, NavbarSpacer } from './components/ui/navbar';
-import { Cog6ToothIcon, SparklesIcon, PlusIcon, ChatBubbleLeftIcon } from '@heroicons/react/20/solid';
+import { Cog6ToothIcon, SparklesIcon, PlusIcon, ChatBubbleLeftIcon, XMarkIcon } from '@heroicons/react/20/solid';
+
+const TOOL_LABELS: Record<string, string> = {
+  search_places: '🗺 場所検索',
+  compute_routes: '🚶 経路',
+  web_search: '🔎 Web検索',
+  google_search: '🔎 Web検索',
+};
 
 export default function App() {
   const {
@@ -17,6 +24,7 @@ export default function App() {
     sendMessage,
     newSession,
     switchSession,
+    deleteSession,
   } = useChat();
   const [inputText, setInputText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -77,18 +85,33 @@ export default function App() {
           <SidebarSection>
             <SidebarHeading>最近の履歴</SidebarHeading>
             {sortedSessions.map((s) => (
-              <SidebarItem
-                key={s.id}
-                current={s.id === currentId}
-                onClick={(e) => {
-                  e.preventDefault();
-                  switchSession(s.id);
-                }}
-                href="#"
-              >
-                <ChatBubbleLeftIcon />
-                <SidebarLabel>{s.title}</SidebarLabel>
-              </SidebarItem>
+              <div key={s.id} className="group relative">
+                <SidebarItem
+                  current={s.id === currentId}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    switchSession(s.id);
+                  }}
+                  href="#"
+                >
+                  <ChatBubbleLeftIcon />
+                  <SidebarLabel className="pr-6">{s.title}</SidebarLabel>
+                </SidebarItem>
+                <button
+                  type="button"
+                  aria-label={`${s.title} を削除`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (window.confirm(`「${s.title}」を削除しますか？`)) {
+                      deleteSession(s.id);
+                    }
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-zinc-400 opacity-0 transition group-hover:opacity-100 hover:bg-zinc-950/10 hover:text-zinc-700 focus:opacity-100 dark:hover:bg-white/10 dark:hover:text-zinc-200"
+                >
+                  <XMarkIcon className="h-4 w-4" />
+                </button>
+              </div>
             ))}
           </SidebarSection>
         )}
@@ -119,7 +142,7 @@ export default function App() {
         <main className="flex-1 overflow-y-auto py-6 pr-2">
           <div className="mx-auto max-w-3xl space-y-6">
             {messages.map((msg, index) => (
-              <div key={index} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div key={index} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                 <div className={`max-w-[85%] sm:max-w-[75%] rounded-2xl px-5 py-3.5 shadow-sm ${
                   msg.role === 'user'
                     ? 'rounded-br-sm bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
@@ -127,6 +150,18 @@ export default function App() {
                 }`}>
                   <p className="whitespace-pre-wrap text-[15px] leading-relaxed">{msg.content}</p>
                 </div>
+                {msg.role === 'assistant' && msg.usedTools && msg.usedTools.length > 0 && (
+                  <div className="mt-1.5 flex flex-wrap gap-1.5 px-1">
+                    {msg.usedTools.map((t) => (
+                      <span
+                        key={t}
+                        className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+                      >
+                        {TOOL_LABELS[t] ?? t}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
 

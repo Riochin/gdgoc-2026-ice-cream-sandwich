@@ -4,6 +4,8 @@
 export interface Message {
   role: 'user' | 'assistant';
   content: string;
+  /** Tools the agent invoked while producing this assistant message. */
+  usedTools?: string[];
 }
 
 /**

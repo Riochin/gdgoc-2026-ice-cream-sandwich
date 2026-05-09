@@ -45,6 +45,20 @@ export function useChat() {
     setError(null);
   }, []);
 
+  const deleteSession = useCallback((id: string) => {
+    setSessions((prev) => {
+      const remaining = prev.filter((s) => s.id !== id);
+      if (remaining.length === 0) {
+        const fresh = createEmptySession();
+        setCurrentId(fresh.id);
+        return [fresh];
+      }
+      setCurrentId((curr) => (curr === id ? remaining[0].id : curr));
+      return remaining;
+    });
+    setError(null);
+  }, []);
+
   const sendMessage = useCallback(
     async (text: string) => {
       if (!text.trim() || !currentId) return;
@@ -83,7 +97,11 @@ export function useChat() {
                   ...s,
                   messages: [
                     ...optimisticMessages,
-                    { role: 'assistant', content: response.reply },
+                    {
+                      role: 'assistant',
+                      content: response.reply,
+                      usedTools: response.metadata?.used_tools,
+                    },
                   ],
                   updatedAt: Date.now(),
                 }
@@ -109,5 +127,6 @@ export function useChat() {
     sendMessage,
     newSession,
     switchSession,
+    deleteSession,
   };
 }
