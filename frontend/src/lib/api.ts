@@ -42,8 +42,15 @@ export async function sendChatMessage(request: ChatRequest): Promise<ChatRespons
   });
 
   if (!response.ok) {
-    // ステータスコードが 2xx 以外の場合はエラーを投げる
-    throw new Error(`チャットAPIの呼び出しに失敗しました: ${response.statusText}`);
+    // バックエンドはエラー時にも { reply: "..." } の JSON を返す
+    let serverMessage: string | undefined;
+    try {
+      const body = (await response.json()) as Partial<ChatResponse>;
+      serverMessage = body.reply;
+    } catch {
+      // ignore JSON parse failure
+    }
+    throw new Error(serverMessage ?? `チャットAPIの呼び出しに失敗しました: ${response.statusText}`);
   }
 
   return response.json() as Promise<ChatResponse>;
