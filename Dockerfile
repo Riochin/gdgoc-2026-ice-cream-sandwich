@@ -18,7 +18,8 @@ COPY --from=frontend-builder /build/backend/frontend/dist ./frontend/dist
 RUN CGO_ENABLED=0 go build -o server .
 
 # Stage 3: Minimal runtime.
-FROM alpine:latest
+FROM alpine:3.20
+RUN apk add --no-cache ca-certificates
 WORKDIR /app
 COPY --from=go-builder /app/server .
 EXPOSE 8080
