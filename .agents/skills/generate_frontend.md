@@ -2,6 +2,7 @@
 
 ## Purpose
 Generate the complete React SPA under `app_build/frontend/` based on `production_artifacts/Technical_Specification.md`.
+本番は Go の `embed.FS` でバイナリに同梱されるため、Firebase Hosting は使わない。
 
 ## Pre-condition
 `production_artifacts/Technical_Specification.md` must exist and be approved.
@@ -16,19 +17,17 @@ Read `production_artifacts/Technical_Specification.md` in full before writing an
 ```
 app_build/frontend/
 ├── package.json
-├── vite.config.ts
+├── vite.config.ts   # base: './' に設定（embed.FS での相対パス対応）
 ├── tailwind.config.ts
 ├── tsconfig.json
 ├── index.html
-├── firebase.json        # Firebase Hosting 設定
-├── .firebaserc          # Firebase project 設定
-├── .env.example         # VITE_API_BASE_URL=http://localhost:8080
+├── .env.example     # VITE_API_BASE_URL=http://localhost:8080（ローカル開発時のみ）
 └── src/
     ├── main.tsx
     ├── App.tsx
     ├── api/
     │   ├── chat.ts      # POST /api/chat
-    │   └── stream.ts    # SSE /api/chat/stream
+    │   └── stream.ts    # SSE /api/chat/stream（オプション）
     ├── components/
     │   ├── ChatWindow.tsx        # 会話ログ + 入力欄
     │   ├── MessageBubble.tsx     # ユーザー/エージェントの吹き出し
@@ -37,15 +36,33 @@ app_build/frontend/
     │   └── LoadingIndicator.tsx  # 送信中スピナー
     ├── hooks/
     │   ├── useChat.ts            # チャット状態管理
-    │   └── useSSE.ts             # SSEストリーム管理
+    │   └── useSSE.ts             # SSEストリーム管理（オプション）
     └── types/
         └── index.ts              # ChatMessage, Restaurant, APIResponse etc.
 ```
 
+> `dist/` は `npm run build` で生成される。Go の `embed.FS` がこれを内包する。
+> `firebase.json` / `.firebaserc` は不要。
+
 ### 3. Implement Each File
 
+#### vite.config.ts
+```ts
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  plugins: [react()],
+  base: './',   // embed.FS での相対パス解決に必要
+  server: {
+    proxy: {
+      '/api': 'http://localhost:8080',  // ローカル開発時にバックエンドへプロキシ
+    },
+  },
+})
+```
+
 #### src/types/index.ts
-Define TypeScript interfaces matching the backend API:
 ```ts
 export interface ChatMessage { role: 'user' | 'assistant'; content: string }
 export interface ChatRequest { session_id: string; message: string; history: ChatMessage[] }
@@ -55,11 +72,11 @@ export interface Restaurant { id: string; name: string; rating: number; address:
 
 #### src/api/chat.ts
 - `sendMessage(req: ChatRequest): Promise<ChatResponse>` — fetch POST `/api/chat`.
+- 本番は同一オリジン（`/api/chat`）。ローカルは vite proxy 経由。`VITE_API_BASE_URL` は不要。
 
 #### src/api/stream.ts（オプション — バックエンドがSSEを実装した場合のみ）
 - `streamMessage(req: ChatRequest, onDelta, onFinal, onError)` — open `EventSource` to `GET /api/chat/stream`.
-- Handle events: `message.delta`, `final`, `error`（最低限この3種）.
-- Implement exponential backoff reconnect on disconnect.
+- Handle events: `message.delta`, `final`, `error`.
 - SSEを使わない場合は `chat.ts` の `sendMessage` のみで対応する。
 
 #### src/hooks/useChat.ts
@@ -108,15 +125,10 @@ export interface Restaurant { id: string; name: string; rating: number; address:
 }
 ```
 
-### 5. Write firebase.json
-```json
-{
-  "hosting": {
-    "public": "dist",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
-    "rewrites": [{ "source": "**", "destination": "/index.html" }]
-  }
-}
+### 5. Write .env.example
+```
+# ローカル開発時のみ参照（本番は同一オリジンのため不要）
+VITE_API_BASE_URL=http://localhost:8080
 ```
 
 ### 6. Output Confirmation
