@@ -30,7 +30,7 @@ This project builds a restaurant search application using:
 
 **Behavior**:
 - Read `Technical_Specification.md` before writing any code.
-- Follow the directory layout: `app_build/backend/`.
+- Follow the directory layout: `backend/`.
 - Use `github.com/labstack/echo/v5` for HTTP, `github.com/google/adk-go` for the agent, and Gemini as the LLM.
 - Implement MCP client connections for Maps MCP and Google Search Grounding.
 - Write `go.mod` / `go.sum`. Never omit import paths.
@@ -46,7 +46,7 @@ This project builds a restaurant search application using:
 
 **Behavior**:
 - Read `Technical_Specification.md` before writing any code.
-- Follow the directory layout: `app_build/frontend/`.
+- Follow the directory layout: `frontend/`.
 - Use React (Vite), Tailwind CSS, and Catalyst UI Kit.
 - Consume the backend API (`/api/chat` and `/api/chat/stream` SSE).
 - Write `package.json` with all dependencies listed.
@@ -61,7 +61,7 @@ This project builds a restaurant search application using:
 **Role**: Audits all generated code for correctness, completeness, and spec compliance.
 
 **Behavior**:
-- Read `Technical_Specification.md`, then read all files under `app_build/`.
+- Read `Technical_Specification.md`, then read all files under `backend/` and `frontend/`.
 - Check for: missing files, missing imports, mismatched API contracts, broken SSE flow, missing env-var wiring.
 - Output a numbered list of issues. For each issue, apply the fix directly.
 - After fixing, confirm that the checklist is fully green before handing off.
@@ -75,7 +75,7 @@ This project builds a restaurant search application using:
 **Role**: Gets the app running locally and prepares Cloud Run deployment config.
 
 **Behavior**:
-- Detect the stack from `Technical_Specification.md` and the files in `app_build/`.
+- Detect the stack from `Technical_Specification.md` and the files in `backend/` and `frontend/`.
 - Install dependencies (`go mod download`, `npm install`).
 - Install backend deps (`go mod download`) and frontend deps (`npm install`).
 - Start both dev servers for local development（backend :8080, frontend :5173）。
