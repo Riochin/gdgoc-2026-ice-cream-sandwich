@@ -1,102 +1,87 @@
 package agent
 
 import (
-    "context"
-    "fmt"
-    "log"
-    "os"
+	"context"
+	"fmt"
+	"log"
+	"os"
 
-    "github.com/google/generative-ai-go/genai"
-    "google.golang.org/api/option"
+	"google.golang.org/genai"
 )
 
 func Init() {
-    log.Println("Initializing Gemini Agent...")
+	log.Println("Initializing Gemini Agent...")
 }
 
 func Run(ctx context.Context, message string, history interface{}) (string, []string, error) {
-    apiKey := os.Getenv("GEMINI_API_KEY")
-    if apiKey == "" {
-        return "", nil, fmt.Errorf("GEMINI_API_KEY is not set")
-    }
+	apiKey := os.Getenv("GEMINI_API_KEY")
+	if apiKey == "" {
+		return "", nil, fmt.Errorf("GEMINI_API_KEY is not set")
+	}
 
-    client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
-    if err != nil {
-        log.Printf("Failed to create GenAI client: %v", err)
-        return "", nil, fmt.Errorf("failed to create client: %w", err)
-    }
-    defer client.Close()
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{APIKey: apiKey})
+	if err != nil {
+		log.Printf("Failed to create GenAI client: %v", err)
+		return "", nil, fmt.Errorf("failed to create client: %w", err)
+	}
 
-    model := client.GenerativeModel("gemini-2.5-flash")
-    model.SystemInstruction = &genai.Content{
-        Parts: []genai.Part{genai.Text(SystemPrompt)},
-    }
+	config := &genai.GenerateContentConfig{
+		SystemInstruction: &genai.Content{
+			Parts: []*genai.Part{{Text: SystemPrompt}},
+		},
+		Tools: []*genai.Tool{
+			{GoogleSearch: &genai.GoogleSearch{}},
+		},
+	}
 
-    // Enable Google Search Grounding tool
-    model.Tools = []*genai.Tool{
-        {
-            GoogleSearch: &genai.GoogleSearch{},
-        },
-    }
+	var chatHistory []*genai.Content
+	if historySlice, ok := history.([]interface{}); ok {
+		for _, hItem := range historySlice {
+			if hMap, ok := hItem.(map[string]interface{}); ok {
+				roleStr, _ := hMap["role"].(string)
+				contentStr, _ := hMap["content"].(string)
 
-    session := model.StartChat()
-    
-    // Parse history
-    if historySlice, ok := history.([]interface{}); ok {
-        for _, hItem := range historySlice {
-            if hMap, ok := hItem.(map[string]interface{}); ok {
-                roleStr, _ := hMap["role"].(string)
-                contentStr, _ := hMap["content"].(string)
+				if roleStr == "assistant" {
+					roleStr = "model"
+				}
 
-                role := roleStr
-                if role == "assistant" {
-                    role = "model"
-                }
+				if roleStr != "" && contentStr != "" {
+					chatHistory = append(chatHistory, &genai.Content{
+						Role:  roleStr,
+						Parts: []*genai.Part{{Text: contentStr}},
+					})
+				}
+			}
+		}
+	}
 
-                if role != "" && contentStr != "" {
-                    session.History = append(session.History, &genai.Content{
-                        Role:  role,
-                        Parts: []genai.Part{genai.Text(contentStr)},
-                    })
-                }
-            }
-        }
-    }
+	chat, err := client.Chats.Create(ctx, "gemini-2.5-flash", config, chatHistory)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to create chat: %w", err)
+	}
 
-    resp, err := session.SendMessage(ctx, genai.Text(message))
-    if err != nil {
-        log.Printf("Failed to send message: %v", err)
-        return "", nil, fmt.Errorf("failed to send message: %w", err)
-    }
+	resp, err := chat.SendMessage(ctx, genai.Part{Text: message})
+	if err != nil {
+		log.Printf("Failed to send message: %v", err)
+		return "", nil, fmt.Errorf("failed to send message: %w", err)
+	}
 
-    var reply string
-    var usedTools []string
+	reply := resp.Text()
+	if reply == "" {
+		reply = "申し訳ありません、回答を生成できませんでした。"
+	}
 
-    if len(resp.Candidates) > 0 {
-        candidate := resp.Candidates[0]
-        if len(candidate.Content.Parts) > 0 {
-            if textPart, ok := candidate.Content.Parts[0].(genai.Text); ok {
-                reply = string(textPart)
-            } else {
-                reply = fmt.Sprintf("%v", candidate.Content.Parts[0])
-            }
-        }
+	var usedTools []string
+	if len(resp.Candidates) > 0 && resp.Candidates[0].GroundingMetadata != nil {
+		usedTools = append(usedTools, "google_search")
+	}
+	if usedTools == nil {
+		usedTools = []string{}
+	}
 
-        // Add used tools heuristic for Google Search Grounding
-        if candidate.GroundingMetadata != nil {
-            usedTools = append(usedTools, "google_search")
-        }
-    } else {
-        reply = "申し訳ありません、回答を生成できませんでした。"
-    }
-
-    if usedTools == nil {
-        usedTools = []string{}
-    }
-
-    return reply, usedTools, nil
+	return reply, usedTools, nil
 }
 
 func RunStream(ctx context.Context, message string, history interface{}) error {
-    return fmt.Errorf("not implemented")
+	return fmt.Errorf("not implemented")
 }

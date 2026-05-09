@@ -28,7 +28,7 @@ func main() {
 
     // SPA 静的ファイル配信
     distFS, _ := fs.Sub(staticFiles, "frontend/dist")
-    e.StaticFS("/", http.FS(distFS))
+    e.StaticFS("/", distFS)
     
     // SPAフォールバック: 全未知パスを index.html へ
     e.GET("/*", func(c echo.Context) error {
