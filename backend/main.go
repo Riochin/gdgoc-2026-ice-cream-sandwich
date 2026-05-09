@@ -5,6 +5,7 @@ import (
     "io/fs"
     "net/http"
     "os"
+    "strings"
 
     "github.com/labstack/echo/v4"
     "github.com/labstack/echo/v4/middleware"
@@ -20,23 +21,28 @@ func main() {
 
     e := echo.New()
     e.Use(middleware.Logger())
-    e.Use(middleware.CORS())  // FRONTEND_ORIGIN は不要（同一オリジンで配信）
+    e.Use(middleware.CORS())
 
-    // API routes
     e.POST("/api/chat", handler.Chat)
-    e.GET("/api/chat/stream", handler.Stream) // オプション
+    e.GET("/api/chat/stream", handler.Stream)
 
-    // SPA 静的ファイル配信
     distFS, _ := fs.Sub(staticFiles, "frontend/dist")
-    e.StaticFS("/", distFS)
-    
-    // SPAフォールバック: 全未知パスを index.html へ
+
+    // Serve static assets; fall back to index.html for SPA client-side routes.
     e.GET("/*", func(c echo.Context) error {
-        content, err := fs.ReadFile(distFS, "index.html")
+        path := strings.TrimPrefix(c.Request().URL.Path, "/")
+        if path == "" {
+            path = "index.html"
+        }
+        if _, err := fs.Stat(distFS, path); err != nil {
+            path = "index.html"
+        }
+        f, err := distFS.Open(path)
         if err != nil {
             return c.String(http.StatusNotFound, "Frontend not built yet")
         }
-        return c.HTMLBlob(http.StatusOK, content)
+        defer f.Close()
+        return c.Stream(http.StatusOK, mimeForPath(path), f)
     })
 
     port := os.Getenv("PORT")
@@ -44,4 +50,29 @@ func main() {
         port = "8080"
     }
     e.Logger.Fatal(e.Start(":" + port))
+}
+
+func mimeForPath(p string) string {
+    switch {
+    case strings.HasSuffix(p, ".html"):
+        return "text/html; charset=utf-8"
+    case strings.HasSuffix(p, ".js"):
+        return "application/javascript"
+    case strings.HasSuffix(p, ".css"):
+        return "text/css; charset=utf-8"
+    case strings.HasSuffix(p, ".svg"):
+        return "image/svg+xml"
+    case strings.HasSuffix(p, ".json"):
+        return "application/json"
+    case strings.HasSuffix(p, ".png"):
+        return "image/png"
+    case strings.HasSuffix(p, ".jpg"), strings.HasSuffix(p, ".jpeg"):
+        return "image/jpeg"
+    case strings.HasSuffix(p, ".woff2"):
+        return "font/woff2"
+    case strings.HasSuffix(p, ".woff"):
+        return "font/woff"
+    default:
+        return "application/octet-stream"
+    }
 }
