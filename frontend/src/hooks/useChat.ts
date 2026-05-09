@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { type Message, sendChatMessage } from '../lib/api';
+import { type Message, streamChatMessage } from '../lib/api';
 import {
   type ChatSession,
   createEmptySession,
@@ -64,17 +64,19 @@ export function useChat() {
       if (!text.trim() || !currentId) return;
 
       const userMessage: Message = { role: 'user', content: text };
+      const placeholder: Message = { role: 'assistant', content: '' };
       const historyBeforeSend = messages;
-      const optimisticMessages = [...historyBeforeSend, userMessage];
+      const withUser = [...historyBeforeSend, userMessage];
+      const withPlaceholder = [...withUser, placeholder];
 
-      // Optimistic UI update + title derivation.
+      // Optimistic UI update: user message + empty assistant slot to stream into.
       setSessions((prev) =>
         prev.map((s) =>
           s.id === currentId
             ? {
                 ...s,
-                messages: optimisticMessages,
-                title: deriveTitle(optimisticMessages),
+                messages: withPlaceholder,
+                title: deriveTitle(withUser),
                 updatedAt: Date.now(),
               }
             : s,
@@ -83,38 +85,46 @@ export function useChat() {
       setIsLoading(true);
       setError(null);
 
-      try {
-        const response = await sendChatMessage({
+      const patchAssistant = (mutator: (m: Message) => Message) => {
+        setSessions((prev) =>
+          prev.map((s) => {
+            if (s.id !== currentId) return s;
+            const msgs = s.messages.slice();
+            const lastIdx = msgs.length - 1;
+            if (lastIdx >= 0 && msgs[lastIdx].role === 'assistant') {
+              msgs[lastIdx] = mutator(msgs[lastIdx]);
+            }
+            return { ...s, messages: msgs, updatedAt: Date.now() };
+          }),
+        );
+      };
+
+      let streamError: string | null = null;
+
+      await streamChatMessage(
+        {
           session_id: currentId,
           message: text,
           history: historyBeforeSend,
-        });
+        },
+        {
+          onDelta: (chunk) => {
+            patchAssistant((m) => ({ ...m, content: m.content + chunk }));
+          },
+          onDone: ({ used_tools, places }) => {
+            patchAssistant((m) => ({ ...m, usedTools: used_tools, places }));
+          },
+          onError: (msg) => {
+            streamError = msg;
+          },
+        },
+      );
 
-        setSessions((prev) =>
-          prev.map((s) =>
-            s.id === currentId
-              ? {
-                  ...s,
-                  messages: [
-                    ...optimisticMessages,
-                    {
-                      role: 'assistant',
-                      content: response.reply,
-                      usedTools: response.metadata?.used_tools,
-                      places: response.metadata?.places,
-                    },
-                  ],
-                  updatedAt: Date.now(),
-                }
-              : s,
-          ),
-        );
-      } catch (err) {
-        console.error('Chat Error:', err);
-        setError(err instanceof Error ? err.message : '通信エラーが発生しました。もう一度お試しください。');
-      } finally {
-        setIsLoading(false);
+      if (streamError) {
+        console.error('Chat stream error:', streamError);
+        setError(streamError);
       }
+      setIsLoading(false);
     },
     [currentId, messages],
   );

@@ -24,7 +24,7 @@ func main() {
     e.Use(middleware.CORS())
 
     e.POST("/api/chat", handler.Chat)
-    e.GET("/api/chat/stream", handler.Stream)
+    e.POST("/api/chat/stream", handler.Stream)
 
     distFS, _ := fs.Sub(staticFiles, "frontend/dist")
 

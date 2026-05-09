@@ -367,6 +367,135 @@ func runFallback(ctx context.Context, message string, history interface{}) (stri
 	return reply, usedTools, nil
 }
 
-func RunStream(ctx context.Context, message string, history interface{}) error {
-	return fmt.Errorf("not implemented")
+// StreamHandler is invoked as the agent produces output. onDelta fires for
+// every text fragment from the model; onDone fires once after the run
+// completes with the aggregated tools + places metadata.
+type StreamHandler struct {
+	OnDelta func(text string)
+	OnDone  func(usedTools []string, places []mcp.Place)
+}
+
+// RunStream runs the agent and emits events through the supplied handler.
+// Falls back to the non-ADK path on init / runtime errors and emits the
+// fallback's final reply as a single delta.
+func RunStream(ctx context.Context, message string, history interface{}, h StreamHandler) error {
+	initOnce.Do(func() {
+		initErr = initADK(ctx)
+		if initErr != nil {
+			log.Printf("ADK initialization failed (will use Gemini fallback): %v", initErr)
+		}
+	})
+
+	if initErr != nil {
+		reply, tools, err := runFallback(ctx, message, history)
+		if err != nil {
+			return err
+		}
+		h.OnDelta(reply)
+		h.OnDone(tools, nil)
+		return nil
+	}
+
+	collected := &[]mcp.Place{}
+	streamCtx := context.WithValue(ctx, placesCollectorKey{}, collected)
+
+	sessResp, err := adkSessionSvc.Create(streamCtx, &session.CreateRequest{
+		AppName: "concierge",
+		UserID:  "anonymous",
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create session: %w", err)
+	}
+	sess := sessResp.Session
+
+	if historySlice, ok := history.([]interface{}); ok {
+		for _, item := range historySlice {
+			m, ok := item.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			role, _ := m["role"].(string)
+			content, _ := m["content"].(string)
+			if role == "" || content == "" {
+				continue
+			}
+			genaiRole := genai.Role("user")
+			author := "user"
+			if role == "assistant" {
+				genaiRole = genai.Role("model")
+				author = "model"
+			}
+			ev := session.NewEvent("history")
+			ev.Author = author
+			ev.LLMResponse = model.LLMResponse{
+				Content: genai.NewContentFromText(content, genaiRole),
+			}
+			if err := adkSessionSvc.AppendEvent(streamCtx, sess, ev); err != nil {
+				log.Printf("failed to inject history event: %v", err)
+			}
+		}
+	}
+
+	userMsg := genai.NewContentFromText(message, genai.RoleUser)
+
+	var usedTools []string
+	toolSeen := map[string]bool{}
+
+	for event, err := range adkRunner.Run(streamCtx, "anonymous", sess.ID(), userMsg, adkagent.RunConfig{}) {
+		if err != nil {
+			runErr := fmt.Errorf("ADK run error: %w", err)
+			log.Printf("ADK stream failed, falling back: %v", runErr)
+			reply, tools, ferr := runFallback(ctx, message, history)
+			if ferr != nil {
+				return ferr
+			}
+			h.OnDelta(reply)
+			h.OnDone(tools, nil)
+			return nil
+		}
+		if event == nil {
+			continue
+		}
+
+		if event.LLMResponse.Content != nil {
+			for _, part := range event.LLMResponse.Content.Parts {
+				if part.FunctionCall != nil && !toolSeen[part.FunctionCall.Name] {
+					usedTools = append(usedTools, part.FunctionCall.Name)
+					toolSeen[part.FunctionCall.Name] = true
+				}
+			}
+		}
+		if event.LLMResponse.GroundingMetadata != nil && !toolSeen["google_search"] {
+			usedTools = append(usedTools, "google_search")
+			toolSeen["google_search"] = true
+		}
+
+		if event.IsFinalResponse() && event.LLMResponse.Content != nil {
+			for _, part := range event.LLMResponse.Content.Parts {
+				if part.Text != "" {
+					h.OnDelta(part.Text)
+				}
+			}
+		}
+	}
+
+	if usedTools == nil {
+		usedTools = []string{}
+	}
+
+	places := *collected
+	if len(places) > 0 {
+		seen := map[string]bool{}
+		uniq := places[:0]
+		for _, p := range places {
+			if p.ID == "" || !seen[p.ID] {
+				seen[p.ID] = true
+				uniq = append(uniq, p)
+			}
+		}
+		places = uniq
+	}
+
+	h.OnDone(usedTools, places)
+	return nil
 }

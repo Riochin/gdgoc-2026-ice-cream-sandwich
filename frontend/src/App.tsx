@@ -142,7 +142,12 @@ export default function App() {
 
         <main className="flex-1 overflow-y-auto py-6 pr-2">
           <div className="mx-auto max-w-3xl space-y-6">
-            {messages.map((msg, index) => (
+            {messages.map((msg, index) => {
+              // While streaming, the assistant message starts empty.
+              // Suppress rendering until at least one chunk arrives so the
+              // typing indicator below is the only visible loading state.
+              if (msg.role === 'assistant' && msg.content === '') return null;
+              return (
               <div key={index} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                 <div className={`max-w-[85%] sm:max-w-[75%] rounded-2xl px-5 py-3.5 shadow-sm ${
                   msg.role === 'user'
@@ -169,7 +174,8 @@ export default function App() {
                   </div>
                 )}
               </div>
-            ))}
+              );
+            })}
 
             {isLoading && (
               <div className="flex justify-start">
