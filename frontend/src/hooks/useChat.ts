@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Message, sendChatMessage } from '../lib/api';
+import { type Message, sendChatMessage } from '../lib/api';
 
 export function useChat() {
   const [messages, setMessages] = useState<Message[]>([
