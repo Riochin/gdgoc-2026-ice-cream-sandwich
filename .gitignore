@@ -1,3 +1,4 @@
 TailwindPlus/
-backend/internal/ui/dist/*
+backend/frontend/dist/*
+!backend/frontend/dist/index.html
 .env
