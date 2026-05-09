@@ -77,11 +77,21 @@ func initADK(ctx context.Context) error {
 		return fmt.Errorf("failed to create compute_routes tool: %w", err)
 	}
 
+	webSearchTool, err := functiontool.New(functiontool.Config{
+		Name:        "web_search",
+		Description: "店舗のメニュー・口コミ・営業時間・予約情報・公式サイトの情報など、Maps では得られない詳細情報を Web から取得します。query: 自然言語の検索質問（例: 「らーめんはやし 渋谷 おすすめメニュー」）",
+	}, func(tCtx tool.Context, input webSearchInput) (webSearchOutput, error) {
+		return doWebSearch(tCtx, apiKey, input.Query)
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create web_search tool: %w", err)
+	}
+
 	ag, err := llmagent.New(llmagent.Config{
 		Name:        "concierge_agent",
 		Model:       geminiModel,
 		Instruction: SystemPrompt,
-		Tools:       []tool.Tool{searchTool, routesTool},
+		Tools:       []tool.Tool{searchTool, routesTool, webSearchTool},
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create LLM agent: %w", err)
@@ -115,6 +125,44 @@ type computeRoutesInput struct {
 	Origin      string `json:"origin"`
 	Destination string `json:"destination"`
 	TravelMode  string `json:"travel_mode"`
+}
+
+type webSearchInput struct {
+	Query string `json:"query"`
+}
+
+type webSearchOutput struct {
+	Summary string `json:"summary"`
+}
+
+// doWebSearch wraps a separate Gemini invocation that has GoogleSearch
+// grounding enabled. The main concierge agent uses function calling and
+// can't enable built-in tools in the same request, so we expose this as a
+// regular function tool instead.
+func doWebSearch(ctx context.Context, apiKey, query string) (webSearchOutput, error) {
+	if query == "" {
+		return webSearchOutput{}, fmt.Errorf("empty query")
+	}
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{APIKey: apiKey})
+	if err != nil {
+		return webSearchOutput{}, fmt.Errorf("web_search: failed to create client: %w", err)
+	}
+	config := &genai.GenerateContentConfig{
+		Tools: []*genai.Tool{{GoogleSearch: &genai.GoogleSearch{}}},
+	}
+	chat, err := client.Chats.Create(ctx, "gemini-2.5-flash", config, nil)
+	if err != nil {
+		return webSearchOutput{}, fmt.Errorf("web_search: failed to create chat: %w", err)
+	}
+	resp, err := chat.SendMessage(ctx, genai.Part{Text: query})
+	if err != nil {
+		return webSearchOutput{}, fmt.Errorf("web_search: send message: %w", err)
+	}
+	text := resp.Text()
+	if text == "" {
+		text = "（該当する情報は見つかりませんでした）"
+	}
+	return webSearchOutput{Summary: text}, nil
 }
 
 func Run(ctx context.Context, message string, history interface{}) (string, []string, error) {
