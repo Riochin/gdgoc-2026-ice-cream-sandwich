@@ -1,7 +1,7 @@
 # Skill: Generate Backend
 
 ## Purpose
-Generate the complete Go backend under `app_build/` based on `production_artifacts/Technical_Specification.md`.
+Generate the complete Go backend under `backend/` based on `production_artifacts/Technical_Specification.md`.
 フロント静的ファイルを `embed.FS` でバイナリに埋め込み、Cloud Run 1サービスで配信する。
 
 ## Pre-condition
@@ -15,7 +15,7 @@ Read `production_artifacts/Technical_Specification.md` in full before writing an
 ### 2. Scaffold Directory Structure
 
 ```
-app_build/                   ← Go module root
+backend/                   ← Go module root
 ├── main.go                  # embed.FS + Echo entrypoint
 ├── go.mod
 ├── go.sum
@@ -32,7 +32,7 @@ app_build/                   ← Go module root
     └── search.go            # google_search
 ```
 
-> `frontend/` ディレクトリは @frontend が `app_build/frontend/` に生成する。
+> `frontend/` ディレクトリは @frontend が `frontend/` に生成する。
 > `frontend/dist/` が存在することを前提に embed する。
 
 ### 3. Implement Each File
@@ -160,4 +160,4 @@ CMD ["./server"]
 
 ### 7. Output Confirmation
 After writing all files, print:
-> "Backend code generated in app_build/. Handoff to @qa for audit."
+> "Backend code generated in backend/. Handoff to @qa for audit."
