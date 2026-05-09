@@ -3,9 +3,9 @@ import { useChat } from './hooks/useChat';
 import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
 import { SidebarLayout } from './components/ui/sidebar-layout';
-import { Sidebar, SidebarHeader, SidebarBody, SidebarItem, SidebarLabel, SidebarSection, SidebarHeading } from './components/ui/sidebar';
+import { Sidebar, SidebarHeader, SidebarBody, SidebarItem, SidebarLabel, SidebarSection } from './components/ui/sidebar';
 import { Navbar, NavbarItem, NavbarSection, NavbarSpacer } from './components/ui/navbar';
-import { Cog6ToothIcon, SparklesIcon, PlusIcon, ChatBubbleLeftIcon } from '@heroicons/react/20/solid';
+import { Cog6ToothIcon, SparklesIcon, PlusIcon } from '@heroicons/react/20/solid';
 
 export default function App() {
   const { messages, isLoading, error, sendMessage } = useChat();
@@ -53,22 +53,6 @@ export default function App() {
           <SidebarItem href="#">
             <PlusIcon />
             <SidebarLabel>新しい検索</SidebarLabel>
-          </SidebarItem>
-        </SidebarSection>
-
-        <SidebarSection>
-          <SidebarHeading>最近の履歴</SidebarHeading>
-          <SidebarItem current href="#">
-            <ChatBubbleLeftIcon />
-            <SidebarLabel>渋谷のイタリアン</SidebarLabel>
-          </SidebarItem>
-          <SidebarItem href="#">
-            <ChatBubbleLeftIcon />
-            <SidebarLabel>新宿のラーメン</SidebarLabel>
-          </SidebarItem>
-          <SidebarItem href="#">
-            <ChatBubbleLeftIcon />
-            <SidebarLabel>銀座の記念日ディナー</SidebarLabel>
           </SidebarItem>
         </SidebarSection>
 
