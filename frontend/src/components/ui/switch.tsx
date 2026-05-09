@@ -1,7 +1,8 @@
 import * as Headless from '@headlessui/react'
 import clsx from 'clsx'
+import type React from 'react'
 
-export function SwitchGroup({ className, ...props }) {
+export function SwitchGroup({ className, ...props }: React.ComponentPropsWithoutRef<'div'>) {
   return (
     <div
       data-slot="control"
@@ -17,7 +18,10 @@ export function SwitchGroup({ className, ...props }) {
   )
 }
 
-export function SwitchField({ className, ...props }) {
+export function SwitchField({
+  className,
+  ...props
+}: { className?: string } & Omit<Headless.FieldProps, 'as' | 'className'>) {
   return (
     <Headless.Field
       data-slot="field"
@@ -130,7 +134,16 @@ const colors = {
   ],
 }
 
-export function Switch({ color = 'dark/zinc', className, ...props }) {
+type Color = keyof typeof colors
+
+export function Switch({
+  color = 'dark/zinc',
+  className,
+  ...props
+}: {
+  color?: Color
+  className?: string
+} & Omit<Headless.SwitchProps, 'as' | 'className' | 'children'>) {
   return (
     <Headless.Switch
       data-slot="control"

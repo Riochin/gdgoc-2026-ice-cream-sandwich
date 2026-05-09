@@ -1,6 +1,6 @@
 import * as Headless from '@headlessui/react'
 import clsx from 'clsx'
-
+import type React from 'react'
 import { Text } from './text'
 
 const sizes = {
@@ -15,7 +15,15 @@ const sizes = {
   '5xl': 'sm:max-w-5xl',
 }
 
-export function Dialog({ size = 'lg', className, children, ...props }) {
+export function Dialog({
+  size = 'lg',
+  className,
+  children,
+  ...props
+}: { size?: keyof typeof sizes; className?: string; children: React.ReactNode } & Omit<
+  Headless.DialogProps,
+  'as' | 'className'
+>) {
   return (
     <Headless.Dialog {...props}>
       <Headless.DialogBackdrop
@@ -42,7 +50,10 @@ export function Dialog({ size = 'lg', className, children, ...props }) {
   )
 }
 
-export function DialogTitle({ className, ...props }) {
+export function DialogTitle({
+  className,
+  ...props
+}: { className?: string } & Omit<Headless.DialogTitleProps, 'as' | 'className'>) {
   return (
     <Headless.DialogTitle
       {...props}
@@ -51,15 +62,18 @@ export function DialogTitle({ className, ...props }) {
   )
 }
 
-export function DialogDescription({ className, ...props }) {
+export function DialogDescription({
+  className,
+  ...props
+}: { className?: string } & Omit<Headless.DescriptionProps<typeof Text>, 'as' | 'className'>) {
   return <Headless.Description as={Text} {...props} className={clsx(className, 'mt-2 text-pretty')} />
 }
 
-export function DialogBody({ className, ...props }) {
+export function DialogBody({ className, ...props }: React.ComponentPropsWithoutRef<'div'>) {
   return <div {...props} className={clsx(className, 'mt-6')} />
 }
 
-export function DialogActions({ className, ...props }) {
+export function DialogActions({ className, ...props }: React.ComponentPropsWithoutRef<'div'>) {
   return (
     <div
       {...props}

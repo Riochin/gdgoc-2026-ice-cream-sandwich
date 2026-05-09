@@ -3,19 +3,19 @@
 import * as Headless from '@headlessui/react'
 import clsx from 'clsx'
 import { LayoutGroup, motion } from 'motion/react'
-import { forwardRef, useId } from 'react'
+import React, { forwardRef, useId } from 'react'
 import { TouchTarget } from './button'
 import { Link } from './link'
 
-export function Navbar({ className, ...props }) {
+export function Navbar({ className, ...props }: React.ComponentPropsWithoutRef<'nav'>) {
   return <nav {...props} className={clsx(className, 'flex flex-1 items-center gap-4 py-2.5')} />
 }
 
-export function NavbarDivider({ className, ...props }) {
+export function NavbarDivider({ className, ...props }: React.ComponentPropsWithoutRef<'div'>) {
   return <div aria-hidden="true" {...props} className={clsx(className, 'h-6 w-px bg-zinc-950/10 dark:bg-white/10')} />
 }
 
-export function NavbarSection({ className, ...props }) {
+export function NavbarSection({ className, ...props }: React.ComponentPropsWithoutRef<'div'>) {
   let id = useId()
 
   return (
@@ -25,14 +25,21 @@ export function NavbarSection({ className, ...props }) {
   )
 }
 
-export function NavbarSpacer({ className, ...props }) {
+export function NavbarSpacer({ className, ...props }: React.ComponentPropsWithoutRef<'div'>) {
   return <div aria-hidden="true" {...props} className={clsx(className, '-ml-4 flex-1')} />
 }
 
 export const NavbarItem = forwardRef(function NavbarItem(
-  { current, className, children, ...props },
-
-  ref
+  {
+    current,
+    className,
+    children,
+    ...props
+  }: { current?: boolean; className?: string; children: React.ReactNode } & (
+    | ({ href?: never } & Omit<Headless.ButtonProps, 'as' | 'className'>)
+    | ({ href: string } & Omit<React.ComponentPropsWithoutRef<typeof Link>, 'className'>)
+  ),
+  ref: React.ForwardedRef<HTMLAnchorElement | HTMLButtonElement>
 ) {
   let classes = clsx(
     // Base
@@ -62,7 +69,12 @@ export const NavbarItem = forwardRef(function NavbarItem(
         />
       )}
       {typeof props.href === 'string' ? (
-        <Link {...props} className={classes} data-current={current ? 'true' : undefined} ref={ref}>
+        <Link
+          {...props}
+          className={classes}
+          data-current={current ? 'true' : undefined}
+          ref={ref as React.ForwardedRef<HTMLAnchorElement>}
+        >
           <TouchTarget>{children}</TouchTarget>
         </Link>
       ) : (
@@ -79,6 +91,6 @@ export const NavbarItem = forwardRef(function NavbarItem(
   )
 })
 
-export function NavbarLabel({ className, ...props }) {
+export function NavbarLabel({ className, ...props }: React.ComponentPropsWithoutRef<'span'>) {
   return <span {...props} className={clsx(className, 'truncate')} />
 }

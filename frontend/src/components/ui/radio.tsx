@@ -1,7 +1,10 @@
 import * as Headless from '@headlessui/react'
 import clsx from 'clsx'
 
-export function RadioGroup({ className, ...props }) {
+export function RadioGroup({
+  className,
+  ...props
+}: { className?: string } & Omit<Headless.RadioGroupProps, 'as' | 'className'>) {
   return (
     <Headless.RadioGroup
       data-slot="control"
@@ -17,7 +20,10 @@ export function RadioGroup({ className, ...props }) {
   )
 }
 
-export function RadioField({ className, ...props }) {
+export function RadioField({
+  className,
+  ...props
+}: { className?: string } & Omit<Headless.FieldProps, 'as' | 'className'>) {
   return (
     <Headless.Field
       data-slot="field"
@@ -109,7 +115,13 @@ const colors = {
   rose: '[--radio-checked-indicator:var(--color-white)] [--radio-checked-bg:var(--color-rose-500)] [--radio-checked-border:var(--color-rose-600)]/90',
 }
 
-export function Radio({ color = 'dark/zinc', className, ...props }) {
+type Color = keyof typeof colors
+
+export function Radio({
+  color = 'dark/zinc',
+  className,
+  ...props
+}: { color?: Color; className?: string } & Omit<Headless.RadioProps, 'as' | 'className' | 'children'>) {
   return (
     <Headless.Radio
       data-slot="control"

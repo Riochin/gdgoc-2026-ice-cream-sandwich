@@ -1,7 +1,8 @@
 'use client'
 
 import * as Headless from '@headlessui/react'
-import { useState } from 'react'
+import { motion } from 'motion/react'
+import React, { useState } from 'react'
 import { NavbarItem } from './navbar'
 
 function OpenMenuIcon() {
@@ -20,7 +21,7 @@ function CloseMenuIcon() {
   )
 }
 
-function MobileSidebar({ open, close, children }) {
+function MobileSidebar({ open, close, children }: React.PropsWithChildren<{ open: boolean; close: () => void }>) {
   return (
     <Headless.Dialog open={open} onClose={close} className="lg:hidden">
       <Headless.DialogBackdrop
@@ -44,19 +45,28 @@ function MobileSidebar({ open, close, children }) {
   )
 }
 
-export function StackedLayout({ navbar, sidebar, children }) {
+export function SidebarLayout({
+  navbar,
+  sidebar,
+  children,
+}: React.PropsWithChildren<{ navbar: React.ReactNode; sidebar: React.ReactNode }>) {
   let [showSidebar, setShowSidebar] = useState(false)
 
   return (
-    <div className="relative isolate flex min-h-svh w-full flex-col bg-white lg:bg-zinc-100 dark:bg-zinc-900 dark:lg:bg-zinc-950">
+    <div className="relative isolate flex min-h-svh w-full bg-white max-lg:flex-col lg:bg-zinc-100 dark:bg-zinc-900 dark:lg:bg-zinc-950">
+      {/* Sidebar on desktop */}
+      <motion.div layoutScroll className="fixed inset-y-0 left-0 w-64 max-lg:hidden">
+        {sidebar}
+      </motion.div>
+
       {/* Sidebar on mobile */}
       <MobileSidebar open={showSidebar} close={() => setShowSidebar(false)}>
         {sidebar}
       </MobileSidebar>
 
-      {/* Navbar */}
-      <header className="flex items-center px-4">
-        <div className="py-2.5 lg:hidden">
+      {/* Navbar on mobile */}
+      <header className="flex items-center px-4 lg:hidden">
+        <div className="py-2.5">
           <NavbarItem onClick={() => setShowSidebar(true)} aria-label="Open navigation">
             <OpenMenuIcon />
           </NavbarItem>
@@ -65,7 +75,7 @@ export function StackedLayout({ navbar, sidebar, children }) {
       </header>
 
       {/* Content */}
-      <main className="flex flex-1 flex-col pb-2 lg:px-2">
+      <main className="flex flex-1 flex-col pb-2 lg:min-w-0 lg:pt-2 lg:pr-2 lg:pl-64">
         <div className="grow p-6 lg:rounded-lg lg:bg-white lg:p-10 lg:shadow-xs lg:ring-1 lg:ring-zinc-950/5 dark:lg:bg-zinc-900 dark:lg:ring-white/10">
           <div className="mx-auto max-w-6xl">{children}</div>
         </div>

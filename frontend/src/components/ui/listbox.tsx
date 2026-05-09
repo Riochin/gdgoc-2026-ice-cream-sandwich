@@ -4,7 +4,20 @@ import * as Headless from '@headlessui/react'
 import clsx from 'clsx'
 import { Fragment } from 'react'
 
-export function Listbox({ className, placeholder, autoFocus, 'aria-label': ariaLabel, children: options, ...props }) {
+export function Listbox<T>({
+  className,
+  placeholder,
+  autoFocus,
+  'aria-label': ariaLabel,
+  children: options,
+  ...props
+}: {
+  className?: string
+  placeholder?: React.ReactNode
+  autoFocus?: boolean
+  'aria-label'?: string
+  children?: React.ReactNode
+} & Omit<Headless.ListboxProps<typeof Fragment, T>, 'as' | 'multiple'>) {
   return (
     <Headless.Listbox {...props} multiple={false}>
       <Headless.ListboxButton
@@ -88,7 +101,14 @@ export function Listbox({ className, placeholder, autoFocus, 'aria-label': ariaL
   )
 }
 
-export function ListboxOption({ children, className, ...props }) {
+export function ListboxOption<T>({
+  children,
+  className,
+  ...props
+}: { className?: string; children?: React.ReactNode } & Omit<
+  Headless.ListboxOptionProps<'div', T>,
+  'as' | 'className'
+>) {
   let sharedClasses = clsx(
     // Base
     'flex min-w-0 items-center',
@@ -138,11 +158,11 @@ export function ListboxOption({ children, className, ...props }) {
   )
 }
 
-export function ListboxLabel({ className, ...props }) {
+export function ListboxLabel({ className, ...props }: React.ComponentPropsWithoutRef<'span'>) {
   return <span {...props} className={clsx(className, 'ml-2.5 truncate first:ml-0 sm:ml-2 sm:first:ml-0')} />
 }
 
-export function ListboxDescription({ className, children, ...props }) {
+export function ListboxDescription({ className, children, ...props }: React.ComponentPropsWithoutRef<'span'>) {
   return (
     <span
       {...props}

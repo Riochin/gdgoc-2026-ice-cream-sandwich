@@ -1,6 +1,6 @@
 import * as Headless from '@headlessui/react'
 import clsx from 'clsx'
-
+import type React from 'react'
 import { Text } from './text'
 
 const sizes = {
@@ -15,7 +15,15 @@ const sizes = {
   '5xl': 'sm:max-w-5xl',
 }
 
-export function Alert({ size = 'md', className, children, ...props }) {
+export function Alert({
+  size = 'md',
+  className,
+  children,
+  ...props
+}: { size?: keyof typeof sizes; className?: string; children: React.ReactNode } & Omit<
+  Headless.DialogProps,
+  'as' | 'className'
+>) {
   return (
     <Headless.Dialog {...props}>
       <Headless.DialogBackdrop
@@ -42,7 +50,10 @@ export function Alert({ size = 'md', className, children, ...props }) {
   )
 }
 
-export function AlertTitle({ className, ...props }) {
+export function AlertTitle({
+  className,
+  ...props
+}: { className?: string } & Omit<Headless.DialogTitleProps, 'as' | 'className'>) {
   return (
     <Headless.DialogTitle
       {...props}
@@ -54,7 +65,10 @@ export function AlertTitle({ className, ...props }) {
   )
 }
 
-export function AlertDescription({ className, ...props }) {
+export function AlertDescription({
+  className,
+  ...props
+}: { className?: string } & Omit<Headless.DescriptionProps<typeof Text>, 'as' | 'className'>) {
   return (
     <Headless.Description
       as={Text}
@@ -64,11 +78,11 @@ export function AlertDescription({ className, ...props }) {
   )
 }
 
-export function AlertBody({ className, ...props }) {
+export function AlertBody({ className, ...props }: React.ComponentPropsWithoutRef<'div'>) {
   return <div {...props} className={clsx(className, 'mt-4')} />
 }
 
-export function AlertActions({ className, ...props }) {
+export function AlertActions({ className, ...props }: React.ComponentPropsWithoutRef<'div'>) {
   return (
     <div
       {...props}

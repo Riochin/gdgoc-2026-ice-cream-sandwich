@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useState, useRef, useEffect } from 'react';
 import { useChat } from './hooks/useChat';
 import { Button } from './components/ui/button';

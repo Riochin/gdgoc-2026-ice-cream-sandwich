@@ -4,7 +4,7 @@ import * as Headless from '@headlessui/react'
 import clsx from 'clsx'
 import { useState } from 'react'
 
-export function Combobox({
+export function Combobox<T>({
   options,
   displayValue,
   filter,
@@ -15,7 +15,16 @@ export function Combobox({
   'aria-label': ariaLabel,
   children,
   ...props
-}) {
+}: {
+  options: T[]
+  displayValue: (value: T | null) => string | undefined
+  filter?: (value: T, query: string) => boolean
+  className?: string
+  placeholder?: string
+  autoFocus?: boolean
+  'aria-label'?: string
+  children: (value: NonNullable<T>) => React.ReactElement
+} & Omit<Headless.ComboboxProps<T, false>, 'as' | 'multiple' | 'children'> & { anchor?: 'top' | 'bottom' }) {
   const [query, setQuery] = useState('')
 
   const filteredOptions =
@@ -49,7 +58,7 @@ export function Combobox({
           autoFocus={autoFocus}
           data-slot="control"
           aria-label={ariaLabel}
-          displayValue={(option) => displayValue(option) ?? ''}
+          displayValue={(option: T) => displayValue(option) ?? ''}
           onChange={(event) => setQuery(event.target.value)}
           placeholder={placeholder}
           className={clsx([
@@ -112,7 +121,14 @@ export function Combobox({
   )
 }
 
-export function ComboboxOption({ children, className, ...props }) {
+export function ComboboxOption<T>({
+  children,
+  className,
+  ...props
+}: { className?: string; children?: React.ReactNode } & Omit<
+  Headless.ComboboxOptionProps<'div', T>,
+  'as' | 'className'
+>) {
   let sharedClasses = clsx(
     // Base
     'flex min-w-0 items-center',
@@ -153,11 +169,11 @@ export function ComboboxOption({ children, className, ...props }) {
   )
 }
 
-export function ComboboxLabel({ className, ...props }) {
+export function ComboboxLabel({ className, ...props }: React.ComponentPropsWithoutRef<'span'>) {
   return <span {...props} className={clsx(className, 'ml-2.5 truncate first:ml-0 sm:ml-2 sm:first:ml-0')} />
 }
 
-export function ComboboxDescription({ className, children, ...props }) {
+export function ComboboxDescription({ className, children, ...props }: React.ComponentPropsWithoutRef<'span'>) {
   return (
     <span
       {...props}

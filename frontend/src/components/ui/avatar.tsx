@@ -1,10 +1,25 @@
 import * as Headless from '@headlessui/react'
 import clsx from 'clsx'
-import { forwardRef } from 'react'
+import React, { forwardRef } from 'react'
 import { TouchTarget } from './button'
 import { Link } from './link'
 
-export function Avatar({ src = null, square = false, initials, alt = '', className, ...props }) {
+type AvatarProps = {
+  src?: string | null
+  square?: boolean
+  initials?: string
+  alt?: string
+  className?: string
+}
+
+export function Avatar({
+  src = null,
+  square = false,
+  initials,
+  alt = '',
+  className,
+  ...props
+}: AvatarProps & React.ComponentPropsWithoutRef<'span'>) {
   return (
     <span
       data-slot="avatar"
@@ -36,9 +51,19 @@ export function Avatar({ src = null, square = false, initials, alt = '', classNa
 }
 
 export const AvatarButton = forwardRef(function AvatarButton(
-  { src, square = false, initials, alt, className, ...props },
-
-  ref
+  {
+    src,
+    square = false,
+    initials,
+    alt,
+    className,
+    ...props
+  }: AvatarProps &
+    (
+      | ({ href?: never } & Omit<Headless.ButtonProps, 'as' | 'className'>)
+      | ({ href: string } & Omit<React.ComponentPropsWithoutRef<typeof Link>, 'className'>)
+    ),
+  ref: React.ForwardedRef<HTMLButtonElement>
 ) {
   let classes = clsx(
     className,
@@ -47,7 +72,7 @@ export const AvatarButton = forwardRef(function AvatarButton(
   )
 
   return typeof props.href === 'string' ? (
-    <Link {...props} className={classes} ref={ref}>
+    <Link {...props} className={classes} ref={ref as React.ForwardedRef<HTMLAnchorElement>}>
       <TouchTarget>
         <Avatar src={src} square={square} initials={initials} alt={alt} />
       </TouchTarget>
