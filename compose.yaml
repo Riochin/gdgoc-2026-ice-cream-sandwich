@@ -1,0 +1,14 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: gdgoc-ice-cream-sandwich
+    container_name: gdgoc-app
+    ports:
+      - "8080:8080"
+    env_file:
+      - backend/.env
+    environment:
+      PORT: "8080"
+    restart: unless-stopped
