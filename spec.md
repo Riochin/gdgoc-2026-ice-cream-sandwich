@@ -1,92 +1,86 @@
 ## 1. 概要
 
-本ドキュメントは、レストラン検索アプリケーションの**バックエンド**に関する詳細仕様を定義する。Go言語および `github.com/google/adk-go` を採用し、ユーザーからの自然言語入力を解釈して、自律的に外部ツール（MCP）を実行するAIエージェントを構築する。
+レストラン検索アプリのバックエンド仕様（ハッカソン版）。Go + ADK でチャットエージェントを実装し、Maps系 MCP と Web検索（Grounding）を呼び出して、自然言語の要望から店を提案する。
 
-## 2. アーキテクチャと技術スタック
+## 2. 技術スタック（最小）
 
-### 2.1 技術スタック
+- **言語**：Go（1.21+）
+- **Webフレームワーク**：Echo（`github.com/labstack/echo/v5`）
+- **エージェントSDK**：`github.com/google/adk-go`
+- **LLM**：Gemini（Vertex AI もしくは AI Studio。**Flashで十分**）
+- **ツール（MCP / Grounding）**
+    - Maps Grounding Lite MCP：`search_places` / `compute_routes`
+    - Google Search Grounding：`google_search`
+- **フロント**：React（SPA）+ Tailwind CSS + Catalyst
+- **配信**：SSE（できれば。間に合わなければ通常JSONでOK）
+- **インフラ**：**GCP / Cloud Run 中心**
 
-- **言語**: Go（1.21+ 推奨）
-- **フレームワーク**: Echo（`github.com/labstack/echo/v5`）
-- **エージェント開発キット**: `github.com/google/adk-go`（Google Agent Development Kit）
-- **LLM**: Gemini（例：Pro / Flash。Vertex AI または AI Studio 経由）
-- **連携ツール（MCP）**
-    - Maps Grounding Lite MCP（例：`search_places`, `compute_routes`）
-    - Google Search Grounding（Web検索用。例：`google_search`）
-- **フロントエンド**: React（SPA）
-- **UI**: Tailwind CSS + Catalyst（UI Kit）
-- **配信**: SSE（Server-Sent Events）
-- **ホスティング**: Google Cloud Run
-
-### 2.2 システムコンポーネント図（論理）
+## 3. システム構成（論理）
 
 ```
-[Echo Handler] <---(JSON)---> [React Frontend]
-      │
-      ▼
-[Agent Manager] (セッション/履歴管理)
-      │
-      ▼
-[ADK Agent (Gemini)] <===(Tool Calls)===> [MCP Clients]
-                                                │
-                                                ├─▶ Maps MCP (Places, Routes)
-                                                └─▶ Search Grounding
+[React SPA] ──HTTP──▶ [Cloud Run: Go + Echo + ADK]
+                          │
+                          ├─▶ Vertex AI (Gemini)
+                          ├─▶ Maps MCP (search_places / compute_routes)
+                          └─▶ Google Search Grounding
 ```
 
-### 2.3 通信の流れ（概要）
+- Backend は **Cloud Run 1サービスに集約**（自前のMCPサーバは作らない、外部ツールを呼ぶだけ）
+- 履歴は **フロントに持たせて毎回送る**（最短実装）
+- ストレージ・キャッシュ・認証は**MVPでは入れない**
 
-1. フロントがユーザー入力を Backend（Echo）へ送信
-2. Backend が `session_id` をもとに履歴を解決し、ADK エージェント実行を開始
-3. ADK が必要に応じて MCP 経由でツールを呼び出し（Places/Routes/Search 等）
-4. 生成結果をフロントへ返却（通常JSON / もしくは SSE ストリーミング）
-5. フロントは会話ログと結果パネルを更新
+## 4. デプロイ構成（GCP / 必要最小）
 
-## 3. APIインターフェース設計
+- **Cloud Run（Backend）**：Go コンテナを1つデプロイ
+- **Vertex AI**：Gemini 呼び出し
+- **Secret Manager**：APIキー類を保存し、Cloud Run のシークレット参照で注入
+- **Artifact Registry + Cloud Build**：`gcloud run deploy --source .` でも可
+- **リージョン**：`asia-northeast1`
+- **フロント配信**：**Firebase Hosting**（最速）。間に合わなければローカル `npm run dev` でデモしてもOK
 
-フロントエンド（チャットUI）との通信インターフェース。
+### Cloud Run 設定の最小ポイント
 
-### 3.1 チャット（通常レスポンス）
+- `--allow-unauthenticated`（デモ用に公開）
+- `--min-instances=0`（コスト優先。コールドスタートは許容）
+- `--timeout=300`（SSE使うなら長めに）
+- `--region=asia-northeast1`
 
-- **パス**: `POST /api/chat`
-- **概要**: ユーザーからのメッセージを受け取り、エージェントの推論結果を返す
-- **リクエスト（JSON）**
+## 5. API設計（MVP）
+
+### 5.1 通常レスポンス
+
+- `POST /api/chat`
+- Request:
 
 ```json
 {
-  "session_id": "user-session-12345",
-  "message": "渋谷の落ち着いたイタリアンを探して",
+  "session_id": "demo-1",
+  "message": "渋谷の落ち着いたイタリアン",
   "history": [
-    {"role": "user", "content": "こんにちは"},
-    {"role": "assistant", "content": "ご用件は？"}
+    {"role": "user", "content": "..."},
+    {"role": "assistant", "content": "..."}
   ]
 }
 ```
 
-- **レスポンス（JSON）**
+- Response:
 
 ```json
 {
-  "reply": "渋谷で落ち着いた雰囲気のイタリアンですね。以下の3件が見つかりました...\n\n1. トラットリア〇〇\n...",
-  "metadata": {
-    "used_tools": ["search_places", "google_search"]
-  }
+  "reply": "...",
+  "metadata": { "used_tools": ["search_places", "google_search"] }
 }
 ```
 
-### 3.2 チャット（SSEストリーミング）
+### 5.2 SSE（できれば）
 
-- **パス（例）**: `GET /api/chat/stream`
-- **目的**: 応答生成をストリーミングし、体感速度を上げる
-- **イベント種別（例）**
-    - `message.delta`：生成途中のテキスト差分
-    - `tool.call` / `tool.result`：デバッグ用（本番UIは非表示でも可）
-    - `final`：完了
-    - `error`：エラー
-- **再接続**: 切断時はクライアント側でリトライ（指数バックオフ）
+- `GET /api/chat/stream?session_id=...&message=...`
+- イベント：`message.delta` / `final` / `error`（最低限）
+- 間に合わなければ 5.1 だけで提出
 
-## 4. エージェント設計（ADK）
+## 6. エージェント設計（ADK）
 
-### 4.1 システムプロンプト（指示書）案
+### システムプロンプト案
 
 ```
 あなたは優秀なレストラン案内コンシェルジュです。
@@ -98,49 +92,73 @@
 3. google_search (Search Grounding): 最新のメニュー情報、口コミ、評判、Webサイトの情報を検索します。
 
 【行動指針】
-- ユーザーの要望が曖昧な場合は、推測して検索するか、必要な条件（エリアや予算など）を優しく質問してください。
-- 店舗を提案する際は、店名、住所、簡単な特徴（口コミやメニュー情報など）を含めてください。
-- ボーナス課題への対応：特定の店舗について聞かれたり、メニューや詳細が求められた場合は、必ず Google Search ツールを使用して最新の情報を取得し、要約して伝えてください。
-- 回答は自然で丁寧な日本語で行ってください。
+- 要望が曖昧でも、推測してまず検索する。条件不足は1問だけ短く確認する。
+- 店舗を提案する際は、店名、住所、簡単な特徴を含める。
+- メニュー/詳細が求められたら google_search で最新情報を要約して伝える（Bonus）。
+- 自然で丁寧な日本語で答える。
 ```
 
-### 4.2 ツール連携フロー（例）
+### ツール連携の最小フロー
 
-1. ユーザーが「新宿の辛いラーメン」と入力
-2. ADKエージェント（Gemini）が入力を解析
-3. Gemini が `search_places` の呼び出しを要求（例：location="新宿", keyword="辛いラーメン"）
-4. Goバックエンドが Maps MCP に対してリクエストを実行し、結果を Gemini に返す
-5. Gemini が追加で `google_search` を要求（例：query="新宿 〇〇ラーメン 辛さ メニュー"）
-6. Goバックエンドが検索結果を Gemini に返す
-7. Gemini が最終回答を生成し、フロントへ返却
+1. 入力受領
+2. `search_places` で候補取得
+3. 必要なら `google_search` で詳細・メニュー補完
+4. 上位3〜5件を理由付きで返却
 
-## 5. 状態管理（セッション / 履歴）
+## 7. 状態管理（最短）
 
-LLMは状態を持たないため、文脈を維持したチャットを行うには過去の会話履歴を扱う必要がある。
+- **MVP**：フロントが `history` を保持、毎回送信
+- 余裕があれば Firestore に `sessions/{session_id}/messages/*` を保存（後付けで追加可能）
 
-- **案A**: フロント側で履歴を保持し、毎回 `/api/chat` に送信（実装がシンプル）
-- **案B**: Goバックエンド側（インメモリ / Redis / Firestore 等）で `session_id` に紐づけて履歴を管理
+## 8. セキュリティ（ハッカソン最小）
 
-## 6. セキュリティと運用
+- APIキーは **Secret Manager** に置き、Cloud Run のシークレット参照で読み込む（コミット禁止）
+- CORS：Echo の `middleware.CORS()` でフロントドメインを許可
+- 公開URLにする場合は、デモ用に簡易的な API Key ヘッダ確認を入れてもよい（任意）
+- WAF / Cloud Armor / 監視は **やらない**（時間があれば）
 
-- **CORS**: Echo のミドルウェア（`middleware.CORS`）でフロントエンドのドメインを許可
-- **環境変数 / Secrets**: Vertex AI / Maps / MCP 接続情報などは Secret Manager 等で管理し、ハードコードしない
-- **レートリミット**: Echo のミドルウェア（`middleware.RateLimiter` 等）で同一IPからの過剰リクエストを抑止
-- **ログ**: 会話入力、抽出条件、ツール呼び出し/結果、失敗理由を保存（デバッグ/改善用）
+## 9. デモ用の割り切り
 
-## 7. MCPツール仕様（案）
+- ログイン無し
+- ユーザーごとの履歴永続化なし（フロントだけ）
+- 多言語対応なし（日本語）
+- エラー時はそのまま「検索に失敗しました、再試行してください」とだけ返す
+- レイテンシは「動けばOK」
+
+## 10. 開発スプリント（目安）
+
+### Day 1
+
+- Goプロジェクト雛形 + Echo `/api/chat` のスタブ
+- Vertex AI（Gemini）疎通確認
+- ADK で1ツール（`google_search`）から繋ぐ
+
+### Day 2
+
+- `search_places` 統合 + ツール呼び出しフローの確立
+- フロントのチャットUI仮組み（Tailwind + Catalyst）
+- Cloud Run へ初回デプロイ（`gcloud run deploy --source .`）
+
+### Day 3
+
+- 結果カードUI / 推薦理由表示
+- （Bonus）`google_search` で店舗メニュー要約
+- SSE化（余裕があれば）
+- デモ動画 / プレゼン資料
+
+## 11. MCPツール仕様（呼び出す側のメモ）
 
 ### search_places（Maps MCP）
 
-- Input（例）: `location`, `keyword`, `open_now`, `price_level` ...
-- Output（例）: places[{id, name, rating, address, lat, lng, url}]
+- Input（例）：`location`, `keyword`, `open_now`, `price_level` ...
+- Output（例）：`places[{id, name, rating, address, lat, lng, url}]`
 
 ### compute_routes（Maps MCP）
 
-- Input（例）: `origin`, `destination`, `travel_mode`
-- Output（例）: route{duration, distance, polyline}
+- Input：`origin`, `destination`, `travel_mode`
+- Output：`route{duration, distance, polyline}`
 
 ### google_search（Search Grounding）
 
-- Input（例）: `query`
-- Output（例）: results[{title, url, snippet}]
+- Input：`query`
+- Output：`results[{title, url, snippet}]`
