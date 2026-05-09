@@ -6,6 +6,7 @@ import { SidebarLayout } from './components/ui/sidebar-layout';
 import { Sidebar, SidebarHeader, SidebarBody, SidebarItem, SidebarLabel, SidebarSection, SidebarHeading } from './components/ui/sidebar';
 import { Navbar, NavbarItem, NavbarSection, NavbarSpacer } from './components/ui/navbar';
 import { Cog6ToothIcon, SparklesIcon, PlusIcon, ChatBubbleLeftIcon, XMarkIcon } from '@heroicons/react/20/solid';
+import { RestaurantCards } from './components/RestaurantCards';
 
 const TOOL_LABELS: Record<string, string> = {
   search_places: '🗺 場所検索',
@@ -160,6 +161,11 @@ export default function App() {
                         {TOOL_LABELS[t] ?? t}
                       </span>
                     ))}
+                  </div>
+                )}
+                {msg.role === 'assistant' && msg.places && msg.places.length > 0 && (
+                  <div className="w-full max-w-[85%] sm:max-w-[75%]">
+                    <RestaurantCards places={msg.places} />
                   </div>
                 )}
               </div>

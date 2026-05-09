@@ -1,11 +1,23 @@
 /**
  * チャットの履歴を構成するメッセージの型定義
  */
+export interface Place {
+  id: string;
+  name: string;
+  rating: number;
+  address: string;
+  lat: number;
+  lng: number;
+  url: string;
+}
+
 export interface Message {
   role: 'user' | 'assistant';
   content: string;
   /** Tools the agent invoked while producing this assistant message. */
   usedTools?: string[];
+  /** Structured Places returned by search_places during this turn. */
+  places?: Place[];
 }
 
 /**
@@ -24,6 +36,7 @@ export interface ChatResponse {
   reply: string;
   metadata?: {
     used_tools?: string[];
+    places?: Place[];
   };
 }
 

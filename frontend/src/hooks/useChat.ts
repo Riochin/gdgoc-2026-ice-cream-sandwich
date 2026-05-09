@@ -101,6 +101,7 @@ export function useChat() {
                       role: 'assistant',
                       content: response.reply,
                       usedTools: response.metadata?.used_tools,
+                      places: response.metadata?.places,
                     },
                   ],
                   updatedAt: Date.now(),

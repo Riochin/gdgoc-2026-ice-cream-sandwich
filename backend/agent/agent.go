@@ -28,6 +28,16 @@ var (
 	initErr       error
 )
 
+// placesCollectorKey is a context.Value key. runWithADK injects a pointer
+// to a slice; the search_places tool appends Place results so the handler
+// can return them to the frontend for card rendering.
+type placesCollectorKey struct{}
+
+func collectorFromContext(ctx context.Context) *[]mcp.Place {
+	p, _ := ctx.Value(placesCollectorKey{}).(*[]mcp.Place)
+	return p
+}
+
 func Init() {
 	log.Println("Initializing agent...")
 	initOnce.Do(func() {
@@ -60,6 +70,9 @@ func initADK(ctx context.Context) error {
 		places, err := mcp.SearchPlaces(tCtx, input.Location, input.Keyword, input.OpenNow, input.PriceLevel)
 		if err != nil {
 			return searchPlacesOutput{}, err
+		}
+		if collector := collectorFromContext(tCtx); collector != nil {
+			*collector = append(*collector, places...)
 		}
 		return searchPlacesOutput{Places: places}, nil
 	})
@@ -165,7 +178,7 @@ func doWebSearch(ctx context.Context, apiKey, query string) (webSearchOutput, er
 	return webSearchOutput{Summary: text}, nil
 }
 
-func Run(ctx context.Context, message string, history interface{}) (string, []string, error) {
+func Run(ctx context.Context, message string, history interface{}) (string, []string, []mcp.Place, error) {
 	initOnce.Do(func() {
 		initErr = initADK(ctx)
 		if initErr != nil {
@@ -175,24 +188,29 @@ func Run(ctx context.Context, message string, history interface{}) (string, []st
 
 	if initErr != nil {
 		log.Printf("ADK unavailable, using Gemini fallback: %v", initErr)
-		return runFallback(ctx, message, history)
+		reply, tools, err := runFallback(ctx, message, history)
+		return reply, tools, nil, err
 	}
 
-	reply, usedTools, err := runWithADK(ctx, message, history)
+	reply, usedTools, places, err := runWithADK(ctx, message, history)
 	if err != nil {
 		log.Printf("ADK run failed, using Gemini fallback: %v", err)
-		return runFallback(ctx, message, history)
+		reply, tools, ferr := runFallback(ctx, message, history)
+		return reply, tools, nil, ferr
 	}
-	return reply, usedTools, nil
+	return reply, usedTools, places, nil
 }
 
-func runWithADK(ctx context.Context, message string, history interface{}) (string, []string, error) {
+func runWithADK(ctx context.Context, message string, history interface{}) (string, []string, []mcp.Place, error) {
+	collected := &[]mcp.Place{}
+	ctx = context.WithValue(ctx, placesCollectorKey{}, collected)
+
 	sessResp, err := adkSessionSvc.Create(ctx, &session.CreateRequest{
 		AppName: "concierge",
 		UserID:  "anonymous",
 	})
 	if err != nil {
-		return "", nil, fmt.Errorf("failed to create session: %w", err)
+		return "", nil, nil, fmt.Errorf("failed to create session: %w", err)
 	}
 	sess := sessResp.Session
 
@@ -234,7 +252,7 @@ func runWithADK(ctx context.Context, message string, history interface{}) (strin
 
 	for event, err := range adkRunner.Run(ctx, "anonymous", sess.ID(), userMsg, adkagent.RunConfig{}) {
 		if err != nil {
-			return "", nil, fmt.Errorf("ADK run error: %w", err)
+			return "", nil, nil, fmt.Errorf("ADK run error: %w", err)
 		}
 		if event == nil {
 			continue
@@ -267,7 +285,21 @@ func runWithADK(ctx context.Context, message string, history interface{}) (strin
 		usedTools = []string{}
 	}
 
-	return reply, usedTools, nil
+	// Dedupe places by ID, preserve discovery order.
+	places := *collected
+	if len(places) > 0 {
+		seen := map[string]bool{}
+		uniq := places[:0]
+		for _, p := range places {
+			if p.ID == "" || !seen[p.ID] {
+				seen[p.ID] = true
+				uniq = append(uniq, p)
+			}
+		}
+		places = uniq
+	}
+
+	return reply, usedTools, places, nil
 }
 
 func runFallback(ctx context.Context, message string, history interface{}) (string, []string, error) {

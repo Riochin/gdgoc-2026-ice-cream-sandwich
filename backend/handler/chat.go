@@ -26,15 +26,20 @@ func Chat(c echo.Context) error {
 
     ctx := c.Request().Context()
     
-    reply, usedTools, err := agent.Run(ctx, req.Message, req.History)
+    reply, usedTools, places, err := agent.Run(ctx, req.Message, req.History)
     if err != nil {
         return c.JSON(http.StatusInternalServerError, map[string]string{"reply": "検索に失敗しました、再試行してください"})
     }
 
+    metadata := map[string]interface{}{
+        "used_tools": usedTools,
+    }
+    if len(places) > 0 {
+        metadata["places"] = places
+    }
+
     return c.JSON(http.StatusOK, ChatResponse{
-        Reply: reply,
-        Metadata: map[string]interface{}{
-            "used_tools": usedTools,
-        },
+        Reply:    reply,
+        Metadata: metadata,
     })
 }
