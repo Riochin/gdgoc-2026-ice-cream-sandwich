@@ -3,9 +3,9 @@ import { useChat } from './hooks/useChat';
 import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
 import { SidebarLayout } from './components/ui/sidebar-layout';
-import { Sidebar, SidebarHeader, SidebarBody, SidebarItem, SidebarLabel } from './components/ui/sidebar';
+import { Sidebar, SidebarHeader, SidebarBody, SidebarItem, SidebarLabel, SidebarSection, SidebarHeading } from './components/ui/sidebar';
 import { Navbar, NavbarItem, NavbarSection, NavbarSpacer } from './components/ui/navbar';
-import { ChatBubbleLeftIcon, Cog6ToothIcon, SparklesIcon } from '@heroicons/react/20/solid';
+import { Cog6ToothIcon, SparklesIcon, PlusIcon, ChatBubbleLeftIcon } from '@heroicons/react/20/solid';
 
 export default function App() {
   const { messages, isLoading, error, sendMessage } = useChat();
@@ -49,14 +49,35 @@ export default function App() {
         </div>
       </SidebarHeader>
       <SidebarBody>
-        <SidebarItem current href="/">
-          <ChatBubbleLeftIcon />
-          <SidebarLabel>Chat</SidebarLabel>
-        </SidebarItem>
-        <SidebarItem href="#">
-          <Cog6ToothIcon />
-          <SidebarLabel>Settings</SidebarLabel>
-        </SidebarItem>
+        <SidebarSection>
+          <SidebarItem href="#">
+            <PlusIcon />
+            <SidebarLabel>新しい検索</SidebarLabel>
+          </SidebarItem>
+        </SidebarSection>
+
+        <SidebarSection>
+          <SidebarHeading>最近の履歴</SidebarHeading>
+          <SidebarItem current href="#">
+            <ChatBubbleLeftIcon />
+            <SidebarLabel>渋谷のイタリアン</SidebarLabel>
+          </SidebarItem>
+          <SidebarItem href="#">
+            <ChatBubbleLeftIcon />
+            <SidebarLabel>新宿のラーメン</SidebarLabel>
+          </SidebarItem>
+          <SidebarItem href="#">
+            <ChatBubbleLeftIcon />
+            <SidebarLabel>銀座の記念日ディナー</SidebarLabel>
+          </SidebarItem>
+        </SidebarSection>
+
+        <SidebarSection className="mt-auto">
+          <SidebarItem href="#">
+            <Cog6ToothIcon />
+            <SidebarLabel>設定</SidebarLabel>
+          </SidebarItem>
+        </SidebarSection>
       </SidebarBody>
     </Sidebar>
   );
