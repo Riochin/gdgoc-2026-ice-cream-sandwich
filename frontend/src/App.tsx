@@ -8,7 +8,16 @@ import { Navbar, NavbarItem, NavbarSection, NavbarSpacer } from './components/ui
 import { Cog6ToothIcon, SparklesIcon, PlusIcon, ChatBubbleLeftIcon } from '@heroicons/react/20/solid';
 
 export default function App() {
-  const { messages, isLoading, error, sendMessage } = useChat();
+  const {
+    sessions,
+    currentId,
+    messages,
+    isLoading,
+    error,
+    sendMessage,
+    newSession,
+    switchSession,
+  } = useChat();
   const [inputText, setInputText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -24,6 +33,8 @@ export default function App() {
       setInputText('');
     }
   };
+
+  const sortedSessions = [...sessions].sort((a, b) => b.updatedAt - a.updatedAt);
 
   const nav = (
     <Navbar>
@@ -50,27 +61,37 @@ export default function App() {
       </SidebarHeader>
       <SidebarBody>
         <SidebarSection>
-          <SidebarItem href="#">
+          <SidebarItem
+            onClick={(e) => {
+              e.preventDefault();
+              newSession();
+            }}
+            href="#"
+          >
             <PlusIcon />
             <SidebarLabel>新しい検索</SidebarLabel>
           </SidebarItem>
         </SidebarSection>
 
-        <SidebarSection>
-          <SidebarHeading>最近の履歴</SidebarHeading>
-          <SidebarItem current href="#">
-            <ChatBubbleLeftIcon />
-            <SidebarLabel>渋谷のイタリアン</SidebarLabel>
-          </SidebarItem>
-          <SidebarItem href="#">
-            <ChatBubbleLeftIcon />
-            <SidebarLabel>新宿のラーメン</SidebarLabel>
-          </SidebarItem>
-          <SidebarItem href="#">
-            <ChatBubbleLeftIcon />
-            <SidebarLabel>銀座の記念日ディナー</SidebarLabel>
-          </SidebarItem>
-        </SidebarSection>
+        {sortedSessions.length > 0 && (
+          <SidebarSection>
+            <SidebarHeading>最近の履歴</SidebarHeading>
+            {sortedSessions.map((s) => (
+              <SidebarItem
+                key={s.id}
+                current={s.id === currentId}
+                onClick={(e) => {
+                  e.preventDefault();
+                  switchSession(s.id);
+                }}
+                href="#"
+              >
+                <ChatBubbleLeftIcon />
+                <SidebarLabel>{s.title}</SidebarLabel>
+              </SidebarItem>
+            ))}
+          </SidebarSection>
+        )}
 
         <SidebarSection className="mt-auto">
           <SidebarItem href="#">
@@ -100,15 +121,15 @@ export default function App() {
             {messages.map((msg, index) => (
               <div key={index} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[85%] sm:max-w-[75%] rounded-2xl px-5 py-3.5 shadow-sm ${
-                  msg.role === 'user' 
-                    ? 'rounded-br-sm bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900' 
+                  msg.role === 'user'
+                    ? 'rounded-br-sm bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
                     : 'rounded-bl-sm border border-zinc-950/5 bg-zinc-50 text-zinc-900 dark:border-white/5 dark:bg-zinc-800/50 dark:text-zinc-100'
                 }`}>
                   <p className="whitespace-pre-wrap text-[15px] leading-relaxed">{msg.content}</p>
                 </div>
               </div>
             ))}
-            
+
             {isLoading && (
               <div className="flex justify-start">
                 <div className="flex items-center gap-1.5 rounded-2xl rounded-bl-sm border border-zinc-950/5 bg-zinc-50 px-5 py-4 shadow-sm dark:border-white/5 dark:bg-zinc-800/50">
@@ -118,7 +139,7 @@ export default function App() {
                 </div>
               </div>
             )}
-            
+
             {error && (
               <div className="my-4 flex justify-center">
                 <div className="rounded-lg bg-red-50 px-4 py-2 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
@@ -143,8 +164,8 @@ export default function App() {
                   className="py-2.5 text-[15px]"
                 />
               </div>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 color="dark/zinc"
                 disabled={!inputText.trim() || isLoading}
               >
